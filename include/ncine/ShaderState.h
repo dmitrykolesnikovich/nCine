@@ -12,9 +12,12 @@ class Shader;
 class DLL_PUBLIC ShaderState
 {
   public:
-	using UpdateFunctionT = void (*)(DrawableNode &node);
+	ShaderState();
+	ShaderState(DrawableNode *node, Shader *shader);
+	~ShaderState();
 
-	explicit ShaderState(DrawableNode &node);
+	inline const DrawableNode *node() const { return node_; }
+	bool setNode(DrawableNode *node);
 
 	inline const Shader *shader() const { return shader_; }
 	bool setShader(Shader *shader);
@@ -33,19 +36,15 @@ class DLL_PUBLIC ShaderState
 	bool setUniformFloat(const char *blockName, const char *name, float value0, float value1, float value2);
 	bool setUniformFloat(const char *blockName, const char *name, float value0, float value1, float value2, float value3);
 
-	inline UpdateFunctionT updateFunction() { return updateFunction_; }
-	inline void setUpdateFunction(UpdateFunctionT updateFunction) { updateFunction_ = updateFunction; }
-
-	inline void *userData() { return userData_; }
-	inline void setUserData(void *userData) { userData_ = userData; }
-
   private:
 	DrawableNode *node_;
 	Shader *shader_;
 	int previousShaderType_;
 
-	UpdateFunctionT updateFunction_;
-	void *userData_;
+	/// Deleted copy constructor
+	ShaderState(const ShaderState &) = delete;
+	/// Deleted assignment operator
+	ShaderState &operator=(const ShaderState &) = delete;
 };
 
 }
