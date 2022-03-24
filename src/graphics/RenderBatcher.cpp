@@ -22,7 +22,7 @@ RenderBatcher::RenderBatcher()
     : buffers_(1)
 {
 	const IGfxCapabilities &gfxCaps = theServiceLocator().gfxCapabilities();
-	const int maxUniformBlockSize = gfxCaps.value(IGfxCapabilities::GLIntValues::MAX_UNIFORM_BLOCK_SIZE);
+	const unsigned int maxUniformBlockSize = static_cast<unsigned int>(gfxCaps.value(IGfxCapabilities::GLIntValues::MAX_UNIFORM_BLOCK_SIZE));
 
 	// Clamping the value as some drivers report a maximum size similar to SSBO one
 	UboMaxSize = maxUniformBlockSize <= 64 * 1024 ? maxUniformBlockSize : 64 * 1024;
@@ -34,42 +34,6 @@ RenderBatcher::RenderBatcher()
 ///////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS
 ///////////////////////////////////////////////////////////
-
-namespace {
-
-	bool isSupportedType(Material::ShaderProgramType type)
-	{
-		return (type == Material::ShaderProgramType::SPRITE ||
-		        type == Material::ShaderProgramType::SPRITE_GRAY ||
-		        type == Material::ShaderProgramType::SPRITE_NO_TEXTURE ||
-		        type == Material::ShaderProgramType::MESH_SPRITE ||
-		        type == Material::ShaderProgramType::MESH_SPRITE_GRAY ||
-		        type == Material::ShaderProgramType::MESH_SPRITE_NO_TEXTURE ||
-		        type == Material::ShaderProgramType::TEXTNODE_ALPHA ||
-		        type == Material::ShaderProgramType::TEXTNODE_RED);
-	}
-
-	bool isSprite(Material::ShaderProgramType type)
-	{
-		return (type == Material::ShaderProgramType::SPRITE ||
-		        type == Material::ShaderProgramType::SPRITE_GRAY ||
-		        type == Material::ShaderProgramType::SPRITE_NO_TEXTURE);
-	}
-
-	bool hasTexture(Material::ShaderProgramType type)
-	{
-		return (type != Material::ShaderProgramType::SPRITE_NO_TEXTURE &&
-		        type != Material::ShaderProgramType::MESH_SPRITE_NO_TEXTURE);
-	}
-
-	bool isBatchedSprite(Material::ShaderProgramType type)
-	{
-		return (type == Material::ShaderProgramType::BATCHED_SPRITES ||
-		        type == Material::ShaderProgramType::BATCHED_SPRITES_GRAY ||
-		        type == Material::ShaderProgramType::BATCHED_SPRITES_NO_TEXTURE);
-	}
-
-}
 
 void RenderBatcher::createBatches(const nctl::Array<RenderCommand *> &srcQueue, nctl::Array<RenderCommand *> &destQueue)
 {
@@ -87,7 +51,7 @@ void RenderBatcher::createBatches(const nctl::Array<RenderCommand *> &srcQueue, 
 	for (unsigned int i = 1; i < srcQueue.size(); i++)
 	{
 		const RenderCommand *command = srcQueue[i];
-		const Material::ShaderProgramType type = command->material().shaderProgramType();
+		const GLShaderProgram *shaderProgram = command->material().shaderProgram();
 		const GLTexture *texture = command->material().texture();
 		const bool isBlendingEnabled = command->material().isBlendingEnabled();
 		const GLenum srcBlendingFactor = command->material().srcBlendingFactor();
@@ -95,7 +59,7 @@ void RenderBatcher::createBatches(const nctl::Array<RenderCommand *> &srcQueue, 
 		const GLenum primitive = command->geometry().primitiveType();
 
 		const RenderCommand *prevCommand = srcQueue[i - 1];
-		const Material::ShaderProgramType prevType = prevCommand->material().shaderProgramType();
+		const GLShaderProgram *prevShaderProgram = prevCommand->material().shaderProgram();
 		const GLTexture *prevTexture = prevCommand->material().texture();
 		const bool prevIsBlendingEnabled = prevCommand->material().isBlendingEnabled();
 		const GLenum prevSrcBlendingFactor = prevCommand->material().srcBlendingFactor();
@@ -107,7 +71,7 @@ void RenderBatcher::createBatches(const nctl::Array<RenderCommand *> &srcQueue, 
 		                             (prevSrcBlendingFactor != srcBlendingFactor || prevDestBlendingFactor != destBlendingFactor);
 
 		// Should split if the shader differs or if it's the same but texture, blending or primitive type aren't
-		const bool shouldSplit = prevType != type || prevTexture != texture || prevPrimitive != primitive || blendingDiffers;
+		const bool shouldSplit = prevShaderProgram != shaderProgram || prevTexture != texture || prevPrimitive != primitive || blendingDiffers;
 
 		// Also collect the very last command if it can be batched with the previous one
 		unsigned int endSplit = (i == srcQueue.size() - 1 && !shouldSplit) ? i + 1 : i;
@@ -116,7 +80,8 @@ void RenderBatcher::createBatches(const nctl::Array<RenderCommand *> &srcQueue, 
 		// Split point if last command or split condition
 		if (i == srcQueue.size() - 1 || shouldSplit || batchSize > maxBatchSize - 1)
 		{
-			if (isSupportedType(prevType) && batchSize >= minBatchSize)
+			const GLShaderProgram *batchedShader = RenderResources::batchedShader(prevCommand->material().shaderProgram());
+			if (batchedShader && batchSize >= minBatchSize)
 			{
 				nctl::Array<RenderCommand *>::ConstIterator start = srcQueue.cBegin() + lastSplit;
 				nctl::Array<RenderCommand *>::ConstIterator end = srcQueue.cBegin() + endSplit;
@@ -177,25 +142,15 @@ RenderCommand *RenderBatcher::collectCommands(
 	unsigned long instancesVertexDataSize = 0;
 	unsigned int instancesIndicesAmount = 0;
 
+	GLShaderProgram *batchedShader = RenderResources::batchedShader(refCommand->material().shaderProgram());
+	FATAL_ASSERT_MSG(batchedShader != nullptr, "Unsupported shader for batch element");
 	bool commandAdded = false;
-	if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::SPRITE)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_SPRITES, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::SPRITE_GRAY)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_SPRITES_GRAY, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::SPRITE_NO_TEXTURE)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_SPRITES_NO_TEXTURE, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::MESH_SPRITE)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_MESH_SPRITES, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::MESH_SPRITE_GRAY)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_MESH_SPRITES_GRAY, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::MESH_SPRITE_NO_TEXTURE)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_MESH_SPRITES_NO_TEXTURE, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::TEXTNODE_ALPHA)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_TEXTNODES_ALPHA, commandAdded);
-	else if (refCommand->material().shaderProgramType() == Material::ShaderProgramType::TEXTNODE_RED)
-		batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(Material::ShaderProgramType::BATCHED_TEXTNODES_RED, commandAdded);
-	else
-		FATAL_MSG("Unsupported shader for batch element");
+	batchCommand = RenderResources::renderCommandPool().retrieveOrAdd(batchedShader, commandAdded);
+
+	const bool isSprite = (refCommand->material().hasAttribute(Material::PositionAttributeName) == false);
+	const bool isMeshSpriteNoTexture = (refCommand->material().hasAttribute(Material::PositionAttributeName) && refCommand->material().hasAttribute(Material::TexCoordsAttributeName) == false);
+	const bool isBatchedSprite = (batchCommand->material().hasAttribute(Material::PositionAttributeName) == false) && batchCommand->material().uniformBlock(Material::InstancesBlockName);
+
 	singleInstanceBlockSize = (*start)->material().uniformBlock(Material::InstanceBlockName)->size();
 
 	batchCommand->setType(refCommand->type());
@@ -230,7 +185,7 @@ RenderCommand *RenderBatcher::collectCommands(
 		unsigned int vertexDataSize = 0;
 		unsigned int numIndices = (*it)->geometry().numIndices();
 
-		if (isSprite(refCommand->material().shaderProgramType()) == false)
+		if (isSprite == false)
 		{
 			unsigned int numVertices = (*it)->geometry().numVertices();
 			if (batchingWithIndices == false)
@@ -258,16 +213,17 @@ RenderCommand *RenderBatcher::collectCommands(
 	nextStart = it;
 
 	// Remove the two missing degenerate vertices or indices from first and last elements
-	if (instancesIndicesAmount > 0)
+	const unsigned long twoVerticesDataSize = 2 * (refCommand->geometry().numElementsPerVertex() + 1) * sizeof(GLfloat);
+	if (instancesIndicesAmount >= 2)
 		instancesIndicesAmount -= 2;
-	else
-		instancesVertexDataSize -= 2 * (refCommand->geometry().numElementsPerVertex() + 1) * sizeof(GLfloat);
+	else if (instancesVertexDataSize >= twoVerticesDataSize)
+		instancesVertexDataSize -= twoVerticesDataSize;
 
 	batchCommand->material().setUniformsDataPointer(acquireMemory(instancesBlockSize));
-	if (commandAdded && hasTexture(refCommand->material().shaderProgramType()))
+	if (commandAdded && refCommand->material().hasAttribute(Material::TexCoordsAttributeName))
 		batchCommand->material().uniform(Material::TextureUniformName)->setIntValue(0); // GL_TEXTURE0
 
-	const unsigned int SizeVertexFormat = ((refCommand->material().shaderProgramType() != Material::ShaderProgramType::MESH_SPRITE_NO_TEXTURE)
+	const unsigned int SizeVertexFormat = ((isMeshSpriteNoTexture == false)
 	                                           ? sizeof(RenderResources::VertexFormatPos2Tex2)
 	                                           : sizeof(RenderResources::VertexFormatPos2));
 	const unsigned int SizeVertexFormatAndIndex = SizeVertexFormat + sizeof(int);
@@ -276,7 +232,8 @@ RenderCommand *RenderBatcher::collectCommands(
 
 	float *destVtx = nullptr;
 	GLushort *destIdx = nullptr;
-	if (isBatchedSprite(batchCommand->material().shaderProgramType()) == false)
+
+	if (isBatchedSprite == false)
 	{
 		const unsigned int numFloats = instancesVertexDataSize / sizeof(GLfloat);
 		destVtx = batchCommand->geometry().acquireVertexPointer(numFloats, NumFloatsVertexFormat + 1); // aligned to vertex format with index
@@ -293,7 +250,7 @@ RenderCommand *RenderBatcher::collectCommands(
 		RenderCommand *command = *it;
 		command->commitNodeTransformation();
 
-		if (isBatchedSprite(batchCommand->material().shaderProgramType()))
+		if (isBatchedSprite)
 		{
 			const GLUniformBlockCache *singleInstanceBlock = command->material().uniformBlock(Material::InstanceBlockName);
 			memcpy(instancesBlock->dataPointer() + instancesBlockOffset, singleInstanceBlock->dataPointer(), singleInstanceBlockSize);
@@ -370,7 +327,7 @@ RenderCommand *RenderBatcher::collectCommands(
 		++it;
 	}
 
-	if (isBatchedSprite(batchCommand->material().shaderProgramType()) == false)
+	if (isBatchedSprite == false)
 	{
 		batchCommand->geometry().releaseVertexPointer();
 		if (destIdx)
@@ -385,7 +342,7 @@ RenderCommand *RenderBatcher::collectCommands(
 	batchCommand->setLayer(refCommand->layer());
 	batchCommand->setVisitOrder(refCommand->visitOrder());
 
-	if (isBatchedSprite(batchCommand->material().shaderProgramType()))
+	if (isBatchedSprite)
 		batchCommand->geometry().setDrawParameters(GL_TRIANGLES, 0, 6 * (nextStart - start));
 	else
 	{

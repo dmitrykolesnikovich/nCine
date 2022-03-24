@@ -53,6 +53,7 @@ class MyEventHandler :
 	float angle_;
 	unsigned int numBlurPasses_;
 
+	bool withAtlas_;
 	bool withViewport_;
 	nctl::UniquePtr<nc::Texture> texture0_;
 	nctl::UniquePtr<nc::Texture> texture1_;
@@ -67,11 +68,13 @@ class MyEventHandler :
 	nctl::UniquePtr<nc::ShaderState> vpShaderStatePass1_;
 
 	nctl::StaticArray<nctl::UniquePtr<nc::Texture>, NumTextures> textures_;
+	nctl::UniquePtr<nc::Texture> megaTexture_;
 	nctl::UniquePtr<nc::Font> font_;
 	nctl::UniquePtr<nctl::String> debugString_;
 	nctl::UniquePtr<nc::TextNode> debugText_;
 
 	nctl::UniquePtr<nc::Shader> spriteShader_;
+	nctl::UniquePtr<nc::Shader> batchedSpriteShader_;
 	nctl::StaticArray<nctl::UniquePtr<nc::Sprite>, NumSprites> sprites_;
 	nctl::StaticArray<nctl::UniquePtr<nc::ShaderState>, NumSprites> spriteShaderStates_;
 
@@ -79,6 +82,8 @@ class MyEventHandler :
 	nctl::UniquePtr<nc::MeshSprite> meshSprite_;
 	nctl::UniquePtr<nc::ShaderState> meshSpriteShaderState_;
 
+	void setupAtlas();
+	void setupTextures();
 	void setupViewport();
 	void checkClick(float x, float y);
 };
