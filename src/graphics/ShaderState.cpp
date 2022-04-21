@@ -124,6 +124,17 @@ bool ShaderState::resetShader()
 	return false;
 }
 
+bool ShaderState::setTexture(unsigned int unit, const Texture *texture)
+{
+	if (node_ == nullptr)
+		return false;
+
+	Material &material = node_->renderCommand_->material();
+	const bool result = texture ? material.setTexture(unit, *texture) : material.setTexture(unit, nullptr);
+
+	return result;
+}
+
 bool ShaderState::setUniformInt(const char *blockName, const char *name, const int *vector)
 {
 	if (node_ == nullptr || shader_ == nullptr || name == nullptr || vector == nullptr)

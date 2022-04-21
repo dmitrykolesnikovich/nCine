@@ -9,6 +9,8 @@ namespace ncine {
 class GLTexture
 {
   public:
+	static const unsigned int MaxTextureUnits = 4;
+
 	explicit GLTexture(GLenum target_);
 	~GLTexture();
 
@@ -33,7 +35,6 @@ class GLTexture
 	void setObjectLabel(const char *label);
 
   private:
-	static const unsigned int MaxTextureUnits = 4;
 	static class GLHashMap<GLTextureMappingFunc::Size, GLTextureMappingFunc> boundTextures_[MaxTextureUnits];
 	static unsigned int boundUnit_;
 
