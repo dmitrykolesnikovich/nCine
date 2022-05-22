@@ -255,4 +255,46 @@ bool ShaderState::setUniformFloat(const char *blockName, const char *name, float
 	return (uniform != nullptr);
 }
 
+unsigned int ShaderState::uniformBlockSize(const char *blockName)
+{
+	if (node_ == nullptr || shader_ == nullptr || blockName == nullptr)
+		return 0;
+
+	unsigned int size = 0;
+	GLUniformBlockCache *uniformBlock = node_->renderCommand_->material().uniformBlock(blockName);
+	if (uniformBlock)
+		size = uniformBlock->size();
+
+	return size;
+}
+
+bool ShaderState::copyToUniformBlock(const char *blockName, unsigned int destIndex, unsigned char *src, unsigned int numBytes)
+{
+	if (node_ == nullptr || shader_ == nullptr || blockName == nullptr)
+		return false;
+
+	GLUniformBlockCache *uniformBlock = node_->renderCommand_->material().uniformBlock(blockName);
+	if (uniformBlock)
+		uniformBlock->copyData(destIndex, src, numBytes);
+
+	return (uniformBlock != nullptr);
+}
+
+bool ShaderState::copyToUniformBlock(const char *blockName, unsigned char *src, unsigned int numBytes)
+{
+	return copyToUniformBlock(blockName, 0, src, numBytes);
+}
+
+bool ShaderState::copyToUniformBlock(const char *blockName, unsigned char *src)
+{
+	if (node_ == nullptr || shader_ == nullptr || blockName == nullptr)
+		return false;
+
+	GLUniformBlockCache *uniformBlock = node_->renderCommand_->material().uniformBlock(blockName);
+	if (uniformBlock)
+		uniformBlock->copyData(src);
+
+	return (uniformBlock != nullptr);
+}
+
 }

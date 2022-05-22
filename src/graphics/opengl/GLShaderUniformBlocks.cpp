@@ -71,7 +71,7 @@ void GLShaderUniformBlocks::setUniformsDataPointer(GLubyte *dataPointer)
 	for (GLUniformBlockCache &uniformBlockCache : uniformBlockCaches_)
 	{
 		uniformBlockCache.setDataPointer(dataPointer + offset);
-		offset += uniformBlockCache.uniformBlock()->size();
+		offset += uniformBlockCache.uniformBlock()->size() - uniformBlockCache.uniformBlock()->alignAmount();
 	}
 }
 
@@ -95,15 +95,33 @@ void GLShaderUniformBlocks::commitUniformBlocks()
 		if (shaderProgram_->status() == GLShaderProgram::Status::LINKED_WITH_INTROSPECTION)
 		{
 			int totalUsedSize = 0;
+			bool hasMemoryGaps = false;
 			for (GLUniformBlockCache &uniformBlockCache : uniformBlockCaches_)
+			{
+				// There is a gap if at least one block cache (not in last position) uses less memory than its size
+				if (uniformBlockCache.dataPointer() != dataPointer_ + totalUsedSize)
+					hasMemoryGaps = true;
 				totalUsedSize += uniformBlockCache.usedSize();
+			}
 
 			if (totalUsedSize > 0)
 			{
 				const RenderBuffersManager::BufferTypes::Enum bufferType = RenderBuffersManager::BufferTypes::UNIFORM;
 				uboParams_ = RenderResources::buffersManager().acquireMemory(bufferType, totalUsedSize);
 				if (uboParams_.mapBase)
-					memcpy(uboParams_.mapBase + uboParams_.offset, dataPointer_, totalUsedSize);
+				{
+					if (hasMemoryGaps)
+					{
+						int offset = 0;
+						for (GLUniformBlockCache &uniformBlockCache : uniformBlockCaches_)
+						{
+							memcpy(uboParams_.mapBase + uboParams_.offset + offset, uniformBlockCache.dataPointer(), uniformBlockCache.usedSize());
+							offset += uniformBlockCache.usedSize();
+						}
+					}
+					else
+						memcpy(uboParams_.mapBase + uboParams_.offset, dataPointer_, totalUsedSize);
+				}
 			}
 		}
 	}
