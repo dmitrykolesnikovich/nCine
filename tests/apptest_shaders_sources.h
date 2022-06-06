@@ -77,7 +77,11 @@ precision mediump float;
 uniform sampler2D uTexture;
 in vec2 vTexCoords;
 flat in vec2 vSpriteSize;
-out vec4 fragColor;
+
+layout(location = 0) out vec4 fragColor0;
+#ifdef WITH_MRT
+layout(location = 1) out vec4 fragColor1;
+#endif
 
 void main()
 {
@@ -88,8 +92,15 @@ void main()
 	color -= texture(uTexture, vTexCoords - onePixel) * 5.0;
 	color += texture(uTexture, vTexCoords + onePixel) * 5.0;
 	color.rgb = vec3((color.r + color.g + color.b) / 3.0);
+	fragColor0 = vec4(color.rgb, alpha);
 
-	fragColor = vec4(color.rgb, alpha);
+#ifdef WITH_MRT
+	float brightness = dot(fragColor0.rgb, vec3(0.2126, 0.7152, 0.0722));
+	if (brightness > 1.0)
+		fragColor1 = vec4(fragColor0.rgb, 1.0);
+	else
+		fragColor1 = vec4(0.0, 0.0, 0.0, 1.0);
+#endif
 }
 )";
 
@@ -206,6 +217,24 @@ void main()
 	vec4 color = texture(uTexture, vTexCoords);
 	float lum = dot(vec3(0.30, 0.59, 0.11), color.rgb);
 	fragColor = vec4(vec3(lum) * vColor.rgb, color.a * vColor.a);
+}
+)";
+
+char const * const blending_fs = R"(
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+uniform sampler2D uTexture0;
+uniform sampler2D uTexture1;
+in vec2 vTexCoords;
+out vec4 fragColor;
+
+void main()
+{
+	vec3 color = texture(uTexture0, vTexCoords).rgb;
+	vec3 bloom = texture(uTexture1, vTexCoords).rgb;
+	fragColor = vec4(color + bloom, 1.0);
 }
 )";
 

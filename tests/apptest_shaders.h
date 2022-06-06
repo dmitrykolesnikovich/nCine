@@ -53,21 +53,29 @@ class MyEventHandler :
 
   private:
 	float angle_;
-	unsigned int numBlurPasses_;
+	int numBlurPasses_;
+	int currentViewportSetup_;
 
 	bool withAtlas_;
-	bool withViewport_;
 	nctl::UniquePtr<nc::Texture> texture0_;
 	nctl::UniquePtr<nc::Texture> texture1_;
+	nctl::UniquePtr<nc::Texture> bloomTexture_;
 	nctl::UniquePtr<nc::Viewport> sceneViewport_;
+	nctl::UniquePtr<nc::Viewport> sceneViewportMrt_;
 	nctl::UniquePtr<nc::Viewport> pingViewport_;
 	nctl::UniquePtr<nc::Viewport> pongViewport_;
 	nctl::UniquePtr<nc::SceneNode> rootNode_;
+	nctl::UniquePtr<nc::SceneNode> rootNodeMrt_;
 	nctl::UniquePtr<nc::Sprite> vpSprite0_;
 	nctl::UniquePtr<nc::Sprite> vpSprite1_;
+	nctl::UniquePtr<nc::Sprite> sceneSprite_;
 	nctl::UniquePtr<nc::Shader> vpBlurShader_;
 	nctl::UniquePtr<nc::ShaderState> vpShaderStatePass0_;
 	nctl::UniquePtr<nc::ShaderState> vpShaderStatePass1_;
+
+	nctl::UniquePtr<nc::Sprite> blendingSprite_;
+	nctl::UniquePtr<nc::Shader> blendingShader_;
+	nctl::UniquePtr<nc::ShaderState> blendingShaderState_;
 
 	nctl::StaticArray<nctl::UniquePtr<nc::Texture>, NumTextures> textures_;
 	nctl::UniquePtr<nc::Texture> megaTexture_;
@@ -76,10 +84,13 @@ class MyEventHandler :
 	nctl::UniquePtr<nc::TextNode> debugText_;
 
 	nctl::UniquePtr<nc::Shader> spriteShader_;
+	nctl::UniquePtr<nc::Shader> spriteMrtShader_;
 	nctl::UniquePtr<nc::Shader> batchedSpriteShader_;
+	nctl::UniquePtr<nc::Shader> batchedSpriteMrtShader_;
 	nctl::StaticArray<nctl::UniquePtr<nc::Sprite>, NumSprites> sprites_;
 	nctl::StaticArray<nctl::UniquePtr<nc::ShaderState>, NumSprites> spriteShaderStates_;
 
+	nctl::UniquePtr<nc::Viewport> blendingViewport_;
 	nctl::UniquePtr<nc::Shader> meshShader_;
 	nctl::UniquePtr<nc::Shader> batchedMeshShader_;
 	nctl::StaticArray<nctl::UniquePtr<nc::MeshSprite>, NumSprites> meshSprites_;
