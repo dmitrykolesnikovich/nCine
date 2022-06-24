@@ -39,7 +39,7 @@ const nc::Vector2f TexelPoints[] = {
 	// clang-format on
 };
 
-const char *TypeLables[] = { "Sprites", "Mesh Sprites", "Text Nodes", "Particle Systems" };
+const char *TypeLabels[] = { "Sprites", "Mesh Sprites", "Text Nodes", "Particle Systems" };
 const char *AnchorPoints[] = { "Center", "Bottom Left", "Top Left", "Bottom Right", "Top Right" };
 const char *BlendingPresets[] = { "Disabled", "Alpha", "Pre-multiplied Alpha", "Additive", "Multiply" };
 
@@ -133,7 +133,7 @@ void MyEventHandler::onFrameStart()
 	const float height = nc::theApplication().height();
 
 	ImGui::Begin("apptest_anchor");
-	if (ImGui::Combo("Type", &currentType_, TypeLables, IM_ARRAYSIZE(TypeLables)))
+	if (ImGui::Combo("Type", &currentType_, TypeLabels, IM_ARRAYSIZE(TypeLabels)))
 	{
 		if (currentType_ == Type::PARTICLE_SYSTEM)
 			lastEmissionTime_ = nc::TimeStamp::now();
